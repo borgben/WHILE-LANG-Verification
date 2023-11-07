@@ -10,4 +10,4 @@ m=a;
     }
     m = m - 1;
   }
-  Post(sum==a+a);
+Post(sum==a+a);
