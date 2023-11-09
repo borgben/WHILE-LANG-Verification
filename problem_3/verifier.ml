@@ -8,6 +8,33 @@ open Z3
   match ast with
   |  Seq(stmt',stmt'') ->  *)
 
+type vc = VC of stmt * Z3.Expr.expr
+
+let rec curryBinaryZ3Fn (fn:context->Z3.Expr.expr->Z3.Expr.expr>Z3.Expr.expr) (ctx:context) (expr_list:expr list) =
+  match expr_list with 
+    []     -> failwith "Invalid Expression List as input to Binary Expression Function"
+   | hd:hd' -> fn ctx hd hd'
+   | hd:tl  -> fn ctx hd (curryBinaryZ3Fn fn ctx tl) 
+  
+let rec getPreCondition (stmt:stmt) =
+  match stmt with
+   Seq(stmt', _) -> 
+    match stmt' with
+      Pre(expr) -> expr
+    | _         -> failwith "Program doesn't contain a pre-condition!"
+  | Pre(expr)   -> expr
+  | _ -> failwith "Program doesn't contain a pre-condition!"
+
+let rec getPostCondition (stmt:stmt) =
+    match stmt with
+     Seq(_, stmt'') -> 
+      match stmt'' with
+        Post(expr) -> expr
+      | _          -> getPostCondition stmt''
+    | Post(expr)   -> expr
+    | _ -> failwith "Program doesn't contain a post-condition!"
+
+
 let rec exprToPredicate (ctx:context) (expr:expr) =
   match expr with 
      Num(integer) -> Z3.Arithmetic.Integer.mk_numeral_i ctx integer
@@ -18,21 +45,22 @@ let rec exprToPredicate (ctx:context) (expr:expr) =
 
 let rec unopToPredicate (ctx:context) (unary_operator:unop) = 
   match unary_operator with 
-     Not -> Z3.Boolean.mk_not ctx 
+    Not -> Z3.Boolean.mk_not ctx 
 
-let binopToPredicate (ctx:context) (unary_operator:unop) = 
+let binopToPredicate (ctx:context) (binary_operator:unop) = 
   match binary_operator with 
     Plus  ->  Z3.Arithmetic.Integer.mk_add ctx
   | Minus ->  Z3.Arithmetic.Integer.mk_sub ctx
   | Times ->  Z3.Arithmetic.Integer.mk_mul ctx
-  | Lt    ->  Z3.Arithmetic.Integer.mk_lt  ctx
-  | And   ->  Z3.Boolean.mk_and ctx 
-  | Or    ->  Z3.Boolean.mk_or ctx 
-  | Eq    ->  Z3.Boolean.mk_eq ctx 
+  | Lt    ->  (curryBinaryZ3Fn Z3.Arithmetic.Integer.mk_lt  ctx)
+  | And   ->  (curryBinaryZ3Fn Z3.Boolean.mk_and ctx)
+  | Or    ->  (curryBinaryZ3Fn Z3.Boolean.mk_or ctx) 
+  | Eq    ->  (curryBinaryZ3Fn Z3.Boolean.mk_eq ctx)
 
-let rec curryBinaryZ3Fn (fn:context->expr->expr->expr) (ctx:context) (expr_list:expr list) =
-  match expr_list with 
-    []     -> failwith "Invalid Expression List as input to Binary Expression Function"
-  | hd:hd' -> fn ctx hd hd'
-  | hd:tl  -> fn ctx hd (curryBinaryZ3Fn fn ctx tl) 
+let stmtToPredicate (ctx:context) (stmt:stmt) = 
+  match stmt with 
+    Skip -> ctx
+  | Post(_) -> ctx
+  | Pre(_)  -> ctx
+  | Assign(identifier, expr) ->  Z
 
