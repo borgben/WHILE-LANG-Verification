@@ -3,7 +3,6 @@ open Implang;;
 open Z3;;
 open Verifier;;
 
-
 let lexbuf = Lexing.from_channel stdin ;;
 let result = Parser.main Lexer.token lexbuf;;
 let ctx =Z3.mk_context [("model", "true"); ("proof", "false")];;

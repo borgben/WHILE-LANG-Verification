@@ -28,9 +28,7 @@ let rec getPostCondition (stmt:stmt) =
                       | _  -> (match getPostCondition stmt' with 
                                 Some(post_condition) -> Some(post_condition)
                               | _ -> None
-                            )
-          )
-      )
+                            )))
     | Post(expr)   -> Some(expr)
     | _ -> None
 
@@ -56,8 +54,6 @@ let rec exprToPredicate (ctx:Z3.context) (expr:expr) =
    | Binary(binary_op,expr',expr'') -> (binopToPredicate ctx binary_op) [(exprToPredicate ctx expr');(exprToPredicate ctx expr'')]
    | _ -> failwith ("unsupported expression " ^ (exprToStr expr))
 
-
-
 let rec stmtToPredicate (ctx:Z3.context) (stmt:stmt) (expr:Z3.Expr.expr) = 
   match stmt with 
     Skip    -> expr
@@ -71,5 +67,3 @@ let rec stmtToPredicate (ctx:Z3.context) (stmt:stmt) (expr:Z3.Expr.expr) =
       let else_expr = (Z3.Boolean.mk_and ctx [(Z3.Boolean.mk_not ctx condition_expr);(stmtToPredicate ctx else_stmt expr)]) in 
       (Z3.Boolean.mk_or ctx [if_expr;else_expr])
   | _ -> failwith ("Unsupported statement"^(stmtToStr stmt))
-
-
