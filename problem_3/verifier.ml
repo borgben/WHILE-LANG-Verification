@@ -1,13 +1,9 @@
 open Implang
 open Z3
 
-(* let rec verifyProg ast:stmt = 
-  match ast with
-  |  Seq(stmt',stmt'') ->  *)
-
 let z3ExprString (expr:Z3.Expr.expr):string = (Z3.Expr.to_string expr)
 
-let rec curryBinaryZ3Fn (fn:context->Z3.Expr.expr->Z3.Expr.expr->Z3.Expr.expr) (ctx:context) (expr_list:Z3.Expr.expr list) =
+let rec curryBinaryZ3Fn (fn:Z3.context->Z3.Expr.expr->Z3.Expr.expr->Z3.Expr.expr) (ctx:Z3.context) (expr_list:Z3.Expr.expr list) =
   match expr_list with 
     []     -> failwith "Invalid Expression List as input to Binary Expression Function"
    | [hd;hd'] -> fn ctx hd hd'
@@ -24,18 +20,25 @@ let rec getPreCondition (stmt:stmt) =
 
 let rec getPostCondition (stmt:stmt) =
     match stmt with
-     Seq(_, stmt'') -> 
+     Seq(stmt', stmt'') -> 
       (match stmt'' with
-        Post(expr) -> expr
-      | _          -> getPostCondition stmt'')
-    | Post(expr)   -> expr
-    | _ -> failwith "Program doesn't contain a post-condition!"
+        Post(expr) -> Some(expr)
+      | _          -> (match getPostCondition stmt'' with 
+                        Some(post_condition) -> Some(post_condition)
+                      | _  -> (match getPostCondition stmt' with 
+                                Some(post_condition) -> Some(post_condition)
+                              | _ -> None
+                            )
+          )
+      )
+    | Post(expr)   -> Some(expr)
+    | _ -> None
 
-let rec unopToPredicate (ctx:context) (unary_operator:unop) = 
+let rec unopToPredicate (ctx:Z3.context) (unary_operator:unop) = 
     match unary_operator with 
       Not -> Z3.Boolean.mk_not ctx 
 
-let binopToPredicate (ctx:context) (binary_operator:binop) = 
+let binopToPredicate (ctx:Z3.context) (binary_operator:binop) = 
     match binary_operator with 
           Plus  ->  Z3.Arithmetic.mk_add ctx
         | Minus ->  Z3.Arithmetic.mk_sub ctx
@@ -45,7 +48,7 @@ let binopToPredicate (ctx:context) (binary_operator:binop) =
         | Or    ->  Z3.Boolean.mk_or ctx
         | Eq    ->  (curryBinaryZ3Fn Z3.Boolean.mk_eq ctx)
 
-let rec exprToPredicate (ctx:context) (expr:expr) =
+let rec exprToPredicate (ctx:Z3.context) (expr:expr) =
   match expr with 
      Num(integer) -> Z3.Arithmetic.Integer.mk_numeral_i ctx integer
    | Var(identifier) -> Z3.Arithmetic.Integer.mk_const_s ctx identifier
