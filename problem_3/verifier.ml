@@ -32,6 +32,11 @@ let rec getPostCondition (stmt:stmt):expr option=
     | Post(expr)   -> Some(expr)
     | _ -> None
 
+let rec makeList (n:int) (constant:'a):'a list = 
+  match n with 
+    0 -> []
+  | _ -> constant::(makeList (n-1) constant)
+
 let rec scanForModifiedVariables (stmt:stmt): string list = 
   match stmt with 
     Seq(stmt',stmt'') -> (scanForModifiedVariables stmt')@(scanForModifiedVariables stmt'')
@@ -79,6 +84,11 @@ let rec stmtToPredicate (ctx:Z3.context) (stmt:stmt) (expr:Z3.Expr.expr):Z3.Expr
       (Z3.Boolean.mk_or ctx [if_expr;else_expr])
   | Whileloop(condition,invariant, stmt') -> (
       let modified_variables = scanForModifiedVariables stmt' in
-      (* 2. Build Expression. *)
+      let condition:Z3.Expr.expr  = exprToPredicate ctx condition in 
+      let invariant:Z3.Expr.expr = exprToPredicate ctx invariant in 
+      let false_condition = Z3.Boolean.mk_implies ctx (Z3.Boolean.mk_not ctx condition) expr in 
+      let true_condition = Z3.Boolean.mk_implies ctx condition (stmtToPredicate ctx stmt' invariant) in 
+      let quantified_expr = Z3.Boolean.mk_implies ctx invariant (Z3.Boolean.mk_and ctx [true_condition;false_condition]) in 
+      Z3.Boolean.mk_and ctx [invariant;Z3.Quantifier.expr_of_quantifier (Z3.Quantifier.mk_forall ctx (makeList (List.length modified_variables) (Z3.Arithmetic.Integer.mk_sort ctx)) (Z3.Symbol.mk_strings ctx modified_variables) quantified_expr None [] [] None None)]
     )
   | _ -> failwith ("Unsupported statement"^(stmtToStr stmt))
