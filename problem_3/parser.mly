@@ -1,12 +1,10 @@
 %{
 open Implang ;;
-  
-
 %}
 
 %token <int> INT
 %token <string> VAR
-%token PLUS MINUS TIMES LT AND OR NOT EQ  EQQ NEQQ GT LE GE
+%token PLUS MINUS TIMES LT AND OR NOT EQ  EQQ NEQQ GT LE GE FORALL DOT
 %token LPAREN RPAREN LCURL RCURL LSQR RSQR SEMI IF ELSE WHILE PRE POST INV MALLOC 
 %token EOF
 %left AR
@@ -47,16 +45,18 @@ expr:
   | NOT expr %prec NOT      { Unary(Not, $2) }
   | TIMES expr              { Deref($2) } 
   | MALLOC expr %prec MALL  { Malloc($2)}
+  | FORALL expr DOT expr    { Forall($2,$4) }
   | VAR LSQR expr RSQR      { Arr($1, $3) } 
 ;
+
   
-stmt :   VAR EQ expr  SEMI               { Assign($1, $3) }
-       | VAR LSQR expr RSQR EQ expr SEMI { ArrAssign($1, $3, $6) } 
-       | TIMES expr EQ expr SEMI         { DerefAssign($2, $4) }
-       | PRE LPAREN expr RPAREN SEMI     { Pre($3) }
-       | POST LPAREN expr RPAREN SEMI    { Post($3) }
+stmt :   VAR EQ expr  SEMI                                                      { Assign($1, $3) }
+       | VAR LSQR expr RSQR EQ expr SEMI                                        { ArrAssign($1, $3, $6) } 
+       | TIMES expr EQ expr SEMI                                                { DerefAssign($2, $4) }
+       | PRE LPAREN expr RPAREN SEMI                                            { Pre($3) }
+       | POST LPAREN expr RPAREN SEMI                                           { Post($3) }
        | IF LPAREN expr RPAREN LCURL prog RCURL ELSE LCURL prog RCURL           { Ifthen($3, $6, $10) }
-       | WHILE LPAREN expr RPAREN LCURL INV LPAREN expr RPAREN SEMI prog RCURL {Whileloop($3, $8, $11)}
+       | WHILE LPAREN expr RPAREN LCURL INV LPAREN expr RPAREN SEMI prog RCURL  { Whileloop($3, $8, $11) }
 ;
 
 

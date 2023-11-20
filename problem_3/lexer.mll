@@ -25,6 +25,7 @@
           | '['            { LSQR }
           | ']'            { RSQR }
 	        | ';'            { SEMI }
+          | '.'            { DOT }
           | "if"           { IF }
           | "else"         { ELSE }
           | "while"        { WHILE }
@@ -32,6 +33,7 @@
           | "Post"         { POST }
           | "Inv"          { INV }
           | "malloc"	     {MALLOC}
+          | "\\"           {FORALL}
           | ['0'-'9']+ as lxm { INT(int_of_string lxm) }
 	        | ['_' 'a'-'z' 'A'-'Z']['_' 'a'-'z' 'A'-'Z' '0'-'9']* as lxm { VAR(lxm) }
           | eof            { EOF }

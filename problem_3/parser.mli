@@ -1,11 +1,11 @@
 type token =
   | INT of (
-# 7 "parser.mly"
+# 5 "parser.mly"
         int
 # 6 "parser.mli"
 )
   | VAR of (
-# 8 "parser.mly"
+# 6 "parser.mly"
         string
 # 11 "parser.mli"
 )
@@ -22,6 +22,8 @@ type token =
   | GT
   | LE
   | GE
+  | FORALL
+  | DOT
   | LPAREN
   | RPAREN
   | LCURL

@@ -12,6 +12,7 @@ type expr =
 	  | Deref of expr
 	  | Var of string 
 	  | Num of int
+		| Forall of expr * expr
 
 type stmt = 
       Skip 
@@ -36,6 +37,7 @@ let binopToStr op =
 
 let unopToStr op = match op with | Not -> "!" 
 
+
 let rec exprToStr e = 
 	match e with 
 	| Num(a) -> string_of_int (a)
@@ -45,9 +47,8 @@ let rec exprToStr e =
 	| Arr(base, idx) -> base ^ "[" ^ exprToStr(idx) ^ "]"
 	| Malloc(size) -> "malloc(" ^ exprToStr(size) ^ ")"
 	| Deref(ptr) -> "*(" ^ exprToStr(ptr) ^ ")"
+	| Forall(expr,expr') -> "V" ^exprToStr(expr)^". "^exprToStr(expr')
 
-
- 
 let rec stmtToStr c = 
 	match c with 
   | Skip -> "/*skip*/\n"
