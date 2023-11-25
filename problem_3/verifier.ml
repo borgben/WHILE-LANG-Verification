@@ -6,8 +6,6 @@ let addArrayMapping (array_map:(expr ExprMap.t) StringMap.t) (identifier:string)
     None           -> StringMap.add identifier (ExprMap.singleton idx subst_expr) array_map 
   | Some(expr_map) -> StringMap.add identifier (ExprMap.add idx subst_expr expr_map) array_map
 
-let getArrayMapping (array_map:(expr ExprMap.t) StringMap.t) (identifier:string) (idx:Implang.expr):expr = ExprMap.find idx (StringMap.find identifier array_map)
-
 (* let z3ExprString (expr:expr):string = (Z3.Expr.to_string expr) *)
 
 let rec curryBinaryZ3Fn (fn:Z3.context->Z3.Expr.expr->Z3.Expr.expr->Z3.Expr.expr) (ctx:Z3.context) (expr_list:Z3.Expr.expr list):Z3.Expr.expr =
@@ -117,7 +115,7 @@ let rec stmtToPredicate (array_map:(expr ExprMap.t) StringMap.t) (stmt:stmt) (po
         Binary(And,invariant,variablesToForAllExpr modified_variables quantified_expr)
       )
     | ArrAssign(identifier, idx_expr, expr') -> (
-        let array_map' = addArrayMapping array_map identifier idx_expr expr' in
-        substExpr array_map' post_predicate (Num(1)) (Num(1))
+        let array_map = addArrayMapping array_map identifier idx_expr expr' in
+        substExpr array_map post_predicate (Num(1)) (Num(1))
       )
     | _ -> failwith ("Unsupported statement"^(stmtToStr stmt))
