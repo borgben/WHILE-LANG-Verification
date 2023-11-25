@@ -24,6 +24,7 @@ type token =
   | GE
   | FORALL
   | DOT
+  | IMPLIES
   | LPAREN
   | RPAREN
   | LCURL

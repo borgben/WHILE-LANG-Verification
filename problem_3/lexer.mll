@@ -17,6 +17,7 @@
           | '>'            { GT }
           | "<="           { LE }
           | ">="           { GE }
+          | "=>"           { IMPLIES }
           | '!'            { NOT }
           | '('            { LPAREN }
           | ')'            { RPAREN }
@@ -32,8 +33,8 @@
           | "Pre"          { PRE }
           | "Post"         { POST }
           | "Inv"          { INV }
-          | "malloc"	     {MALLOC}
-          | "\\"           {FORALL}
+          | "malloc"	     { MALLOC }
+          | "\\"           { FORALL }
           | ['0'-'9']+ as lxm { INT(int_of_string lxm) }
 	        | ['_' 'a'-'z' 'A'-'Z']['_' 'a'-'z' 'A'-'Z' '0'-'9']* as lxm { VAR(lxm) }
           | eof            { EOF }

@@ -4,7 +4,7 @@ open Implang ;;
 
 %token <int> INT
 %token <string> VAR
-%token PLUS MINUS TIMES LT AND OR NOT EQ  EQQ NEQQ GT LE GE FORALL DOT
+%token PLUS MINUS TIMES LT AND OR NOT EQ  EQQ NEQQ GT LE GE FORALL DOT IMPLIES
 %token LPAREN RPAREN LCURL RCURL LSQR RSQR SEMI IF ELSE WHILE PRE POST INV MALLOC 
 %token EOF
 %left AR
@@ -42,6 +42,7 @@ expr:
   | expr LE expr            { Unary(Not, Binary(Lt, $3, $1)) }
   | expr EQQ expr           { Binary(Eq, $1, $3) }
   | expr NEQQ expr          { Unary(Not, Binary(Eq, $1, $3)) }
+  | expr IMPLIES expr       { Implies($1,$3) }
   | NOT expr %prec NOT      { Unary(Not, $2) }
   | TIMES expr              { Deref($2) } 
   | MALLOC expr %prec MALL  { Malloc($2)}

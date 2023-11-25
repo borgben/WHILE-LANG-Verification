@@ -1,21 +1,14 @@
-open Implang;;
-open Z3;;
+open Implang
+open Z3
 
-module ExprMap = Map.Make(struct 
-  type t = Implang.expr 
-  let compare x y = if x = y then 1 else 0 
-end)
-
-module StringMap = Map.Make(String)
-
-let addArrayMapping (array_map:(Z3.Expr.expr ExprMap.t) StringMap.t) (identifier:string) (idx:Implang.expr) (subst_expr:Z3.Expr.expr):(Z3.Expr.expr ExprMap.t) StringMap.t = 
+let addArrayMapping (array_map:(expr ExprMap.t) StringMap.t) (identifier:string) (idx:Implang.expr) (subst_expr:expr):(expr ExprMap.t) StringMap.t = 
   match (StringMap.find_opt identifier array_map) with 
     None           -> StringMap.add identifier (ExprMap.singleton idx subst_expr) array_map 
   | Some(expr_map) -> StringMap.add identifier (ExprMap.add idx subst_expr expr_map) array_map
 
-let getArrayMapping (array_map:(Z3.Expr.expr ExprMap.t) StringMap.t) (identifier:string) (idx:Implang.expr):Z3.Expr.expr = ExprMap.find idx (StringMap.find identifier array_map)
+let getArrayMapping (array_map:(expr ExprMap.t) StringMap.t) (identifier:string) (idx:Implang.expr):expr = ExprMap.find idx (StringMap.find identifier array_map)
 
-let z3ExprString (expr:Z3.Expr.expr):string = (Z3.Expr.to_string expr)
+(* let z3ExprString (expr:expr):string = (Z3.Expr.to_string expr) *)
 
 let rec curryBinaryZ3Fn (fn:Z3.context->Z3.Expr.expr->Z3.Expr.expr->Z3.Expr.expr) (ctx:Z3.context) (expr_list:Z3.Expr.expr list):Z3.Expr.expr =
   match expr_list with 
@@ -83,42 +76,48 @@ let binopToPredicate (ctx:Z3.context) (binary_operator:binop):Z3.Expr.expr list 
   | Eq    ->  (curryBinaryZ3Fn Z3.Boolean.mk_eq ctx)
 
 (*TODO: Test the Forall case. *)
-let rec exprToPredicate (ctx:Z3.context) (expr:expr):Z3.Expr.expr =
+let rec exprToZ3Predicate (ctx:Z3.context) (expr:expr):Z3.Expr.expr =
   match expr with 
     Num(integer)                                  -> Z3.Arithmetic.Integer.mk_numeral_i ctx integer
   | Var(identifier)                               -> Z3.Arithmetic.Integer.mk_const_s ctx identifier
-  | Unary(unary_op,expr')                         -> (unopToPredicate ctx unary_op) (exprToPredicate ctx expr')
-  | Binary(binary_op,expr',expr'')                -> (binopToPredicate ctx binary_op) [(exprToPredicate ctx expr');(exprToPredicate ctx expr'')]
+  | Unary(unary_op,expr')                         -> (unopToPredicate ctx unary_op) (exprToZ3Predicate ctx expr')
+  | Binary(binary_op,expr',expr'')                -> (binopToPredicate ctx binary_op) [(exprToZ3Predicate ctx expr');(exprToZ3Predicate ctx expr'')]
   | Arr(identifier,expr')                         -> Z3.Arithmetic.Integer.mk_const_s ctx (exprToStr (Arr(identifier,expr')))
   | Forall(quantified_variable, quantified_expr)  -> (
       let quantified_variable = (Z3.Symbol.mk_string ctx (exprToIdentifier quantified_variable)) in 
-      let quantified_expr = exprToPredicate ctx quantified_expr in
-      Z3.Quantifier.expr_of_quantifier (Z3.Quantifier.mk_forall ctx [(Z3.Arithmetic.Integer.mk_sort ctx)] [quantified_variable] quantified_expr None [] [] None None))
+      let quantified_expr = exprToZ3Predicate ctx quantified_expr in
+      Z3.Quantifier.expr_of_quantifier (Z3.Quantifier.mk_forall ctx [(Z3.Arithmetic.Integer.mk_sort ctx)] [quantified_variable] quantified_expr None [] [] None None)
+    )
+  | Implies(expr',expr'')                         -> (Z3.Boolean.mk_implies ctx (exprToZ3Predicate ctx expr') (exprToZ3Predicate ctx expr''))
   | _                                             -> failwith ("Unsupported expression " ^ (exprToStr expr))
 
-let rec stmtToPredicate (ctx:Z3.context) (array_map:(Z3.Expr.expr ExprMap.t) StringMap.t) (stmt:stmt) (expr:Z3.Expr.expr):Z3.Expr.expr = 
+let rec variablesToForAllExpr (vars:string list) (expr:expr):expr =
+  match vars with 
+   hd::tl -> Forall(Var(hd),variablesToForAllExpr tl expr )
+  | []    -> expr                          
+
+(*TODO: Make Array Map a Reference*)
+let rec stmtToPredicate (array_map:(expr ExprMap.t) StringMap.t) (stmt:stmt) (post_predicate:expr):expr= 
   match stmt with 
-    Skip    -> expr
-  | Post(_) -> expr
-  | Pre(_)  -> expr
-  | Assign(identifier, expr') ->  Z3.Expr.substitute expr [(Z3.Arithmetic.Integer.mk_const_s ctx identifier)] [(exprToPredicate ctx expr')]
-  | Seq(stmt',stmt'')         ->  stmtToPredicate ctx array_map stmt' (stmtToPredicate ctx array_map stmt'' expr)
-  | Ifthen(condition,if_stmt,else_stmt) -> 
-      let condition_expr = exprToPredicate ctx condition in
-      let if_expr   = (Z3.Boolean.mk_and ctx [condition_expr;(stmtToPredicate ctx array_map if_stmt expr)]) in 
-      let else_expr = (Z3.Boolean.mk_and ctx [(Z3.Boolean.mk_not ctx condition_expr);(stmtToPredicate ctx array_map else_stmt expr)]) in 
-      (Z3.Boolean.mk_or ctx [if_expr;else_expr])
-  | Whileloop(condition,invariant, stmt') -> (
-      let modified_variables = scanForModifiedVariables stmt' in
-      let condition:Z3.Expr.expr  = exprToPredicate ctx condition in 
-      let invariant:Z3.Expr.expr = exprToPredicate ctx invariant in 
-      let false_condition = Z3.Boolean.mk_implies ctx (Z3.Boolean.mk_not ctx condition) expr in 
-      let true_condition = Z3.Boolean.mk_implies ctx condition (stmtToPredicate ctx array_map stmt' invariant) in 
-      let quantified_expr = Z3.Boolean.mk_implies ctx invariant (Z3.Boolean.mk_and ctx [true_condition;false_condition]) in 
-      Z3.Boolean.mk_and ctx [invariant;Z3.Quantifier.expr_of_quantifier (Z3.Quantifier.mk_forall ctx (makeList (List.length modified_variables) (Z3.Arithmetic.Integer.mk_sort ctx)) (Z3.Symbol.mk_strings ctx modified_variables) quantified_expr None [] [] None None)]
-    )
-  | ArrAssign(identifier, idx_expr, expr') -> (
-      let array_map' = addArrayMapping array_map identifier idx_expr (exprToPredicate ctx expr') in
-      Z3.Expr.substitute expr [(Z3.Arithmetic.Integer.mk_const_s ctx (exprToStr (Arr (identifier,idx_expr))))] [(exprToPredicate ctx expr')]
-    )
-  | _ -> failwith ("Unsupported statement"^(stmtToStr stmt))
+      Skip                                ->  post_predicate
+    | Post(_)                             ->  post_predicate
+    | Pre(_)                              ->  post_predicate
+    | Assign(identifier, expr')           ->  substExpr array_map post_predicate (Var(identifier)) expr'
+    | Seq(stmt',stmt'')                   ->  stmtToPredicate array_map stmt' (stmtToPredicate array_map stmt'' post_predicate)
+    | Ifthen(condition,if_stmt,else_stmt) ->  ( 
+        let if_expr   = Binary(And,condition, stmtToPredicate array_map if_stmt post_predicate) in
+        let else_expr = Binary(And,Unary(Not,condition),(stmtToPredicate array_map else_stmt post_predicate)) in 
+        Binary(Or,if_expr,else_expr)
+      )
+    | Whileloop(condition,invariant, stmt') -> (
+        let modified_variables:string list = scanForModifiedVariables stmt' in
+        let false_condition = Implies(Unary(Not,condition),post_predicate) in 
+        let true_condition  = Implies(condition,(stmtToPredicate array_map stmt' invariant)) in 
+        let quantified_expr = Implies(invariant,(Binary(And,true_condition,false_condition))) in 
+        Binary(And,invariant,variablesToForAllExpr modified_variables quantified_expr)
+      )
+    | ArrAssign(identifier, idx_expr, expr') -> (
+        let array_map' = addArrayMapping array_map identifier idx_expr expr' in
+        substExpr array_map' post_predicate (Num(1)) (Num(1))
+      )
+    | _ -> failwith ("Unsupported statement"^(stmtToStr stmt))
