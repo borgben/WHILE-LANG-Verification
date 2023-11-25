@@ -69,18 +69,18 @@ let rec stmtToStr c =
 	| Ifthen(e, c1, c2) -> "if( " ^ exprToStr(e) ^ "){ \n" ^ stmtToStr(c1) ^ "} else { \n" ^ stmtToStr(c2) ^ "} \n" 
 	| Whileloop(e, inv, c1) -> "while(" ^ exprToStr(e) ^ "){\n" ^ "Inv(" ^ exprToStr(inv) ^ "); \n" ^ stmtToStr(c1) ^ "}\n"
 
-let rec substExpr (array_map:(expr ExprMap.t) StringMap.t) (base_expr:expr) (og_expr:expr) (subst_expr:expr):expr = 
+let rec substExpr (array_map_ref:((expr ExprMap.t) StringMap.t) ref) (base_expr:expr) (og_expr:expr) (subst_expr:expr):expr = 
 	match base_expr with 
 		Num(_)               -> base_expr
 	| Var(_)               -> if base_expr = og_expr then subst_expr else base_expr
-	| Unary(op,expr)       -> Unary(op,(substExpr array_map expr og_expr subst_expr))
-	| Binary(op,expr,expr')-> Binary(op,(substExpr array_map expr og_expr subst_expr),(substExpr array_map expr' og_expr subst_expr))
+	| Unary(op,expr)       -> Unary(op,(substExpr array_map_ref expr og_expr subst_expr))
+	| Binary(op,expr,expr')-> Binary(op,(substExpr array_map_ref expr og_expr subst_expr),(substExpr array_map_ref expr' og_expr subst_expr))
 	| Arr(identifier,expr) -> (
 		  let update_arr_expr arr_expr is_updated = match is_updated with Some(updated_expr) -> updated_expr | None -> arr_expr in 
-			let expr_map:expr ExprMap.t = match (StringMap.find_opt identifier array_map) with Some(expr_map) -> expr_map | None -> ExprMap.empty in  
-			let updated_arr_expr  = (substExpr array_map expr og_expr subst_expr) in 
+			let expr_map:expr ExprMap.t = match (StringMap.find_opt identifier (!array_map_ref)) with Some(expr_map) -> expr_map | None -> ExprMap.empty in  
+			let updated_arr_expr  = (substExpr array_map_ref expr og_expr subst_expr) in 
 			update_arr_expr (Arr(identifier,updated_arr_expr)) (ExprMap.find_opt updated_arr_expr expr_map)
 		)
-	| Forall(expr,expr')   -> if expr = og_expr then base_expr else Forall(expr,substExpr array_map expr' og_expr subst_expr)
-	| Implies(expr,expr')  -> Implies(substExpr array_map expr og_expr subst_expr,substExpr array_map expr' og_expr subst_expr)
+	| Forall(expr,expr')   -> if expr = og_expr then base_expr else Forall(expr,substExpr array_map_ref expr' og_expr subst_expr)
+	| Implies(expr,expr')  -> Implies(substExpr array_map_ref expr og_expr subst_expr,substExpr array_map_ref expr' og_expr subst_expr)
 	| _                    -> failwith ("Invalid Expression "^exprToStr(base_expr)^" !")                  

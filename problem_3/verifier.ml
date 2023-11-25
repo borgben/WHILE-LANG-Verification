@@ -95,27 +95,27 @@ let rec variablesToForAllExpr (vars:string list) (expr:expr):expr =
   | []    -> expr                          
 
 (*TODO: Make Array Map a Reference*)
-let rec stmtToPredicate (array_map:(expr ExprMap.t) StringMap.t) (stmt:stmt) (post_predicate:expr):expr= 
+let rec stmtToPredicate (array_map_ref:((expr ExprMap.t) StringMap.t) ref) (stmt:stmt) (post_predicate:expr):expr= 
   match stmt with 
       Skip                                ->  post_predicate
     | Post(_)                             ->  post_predicate
     | Pre(_)                              ->  post_predicate
-    | Assign(identifier, expr')           ->  substExpr array_map post_predicate (Var(identifier)) expr'
-    | Seq(stmt',stmt'')                   ->  stmtToPredicate array_map stmt' (stmtToPredicate array_map stmt'' post_predicate)
+    | Assign(identifier, expr')           ->  substExpr array_map_ref post_predicate (Var(identifier)) expr'
+    | Seq(stmt',stmt'')                   ->  stmtToPredicate array_map_ref stmt' (stmtToPredicate array_map_ref stmt'' post_predicate)
     | Ifthen(condition,if_stmt,else_stmt) ->  ( 
-        let if_expr   = Binary(And,condition, stmtToPredicate array_map if_stmt post_predicate) in
-        let else_expr = Binary(And,Unary(Not,condition),(stmtToPredicate array_map else_stmt post_predicate)) in 
+        let if_expr   = Binary(And,condition, stmtToPredicate array_map_ref if_stmt post_predicate) in
+        let else_expr = Binary(And,Unary(Not,condition),(stmtToPredicate array_map_ref else_stmt post_predicate)) in 
         Binary(Or,if_expr,else_expr)
       )
     | Whileloop(condition,invariant, stmt') -> (
         let modified_variables:string list = scanForModifiedVariables stmt' in
         let false_condition = Implies(Unary(Not,condition),post_predicate) in 
-        let true_condition  = Implies(condition,(stmtToPredicate array_map stmt' invariant)) in 
+        let true_condition  = Implies(condition,(stmtToPredicate array_map_ref stmt' invariant)) in 
         let quantified_expr = Implies(invariant,(Binary(And,true_condition,false_condition))) in 
         Binary(And,invariant,variablesToForAllExpr modified_variables quantified_expr)
       )
     | ArrAssign(identifier, idx_expr, expr') -> (
-        let array_map = addArrayMapping array_map identifier idx_expr expr' in
-        substExpr array_map post_predicate (Num(1)) (Num(1))
+        let array_map_ref = ref (addArrayMapping (!array_map_ref) identifier idx_expr expr') in
+        substExpr array_map_ref post_predicate (Num(1)) (Num(1))
       )
     | _ -> failwith ("Unsupported statement"^(stmtToStr stmt))
