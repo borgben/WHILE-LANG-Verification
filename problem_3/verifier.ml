@@ -6,8 +6,6 @@ let addArrayMapping (array_map:(expr ExprMap.t) StringMap.t) (identifier:string)
     None           -> StringMap.add identifier (ExprMap.singleton idx subst_expr) array_map 
   | Some(expr_map) -> StringMap.add identifier (ExprMap.add idx subst_expr expr_map) array_map
 
-(* let z3ExprString (expr:expr):string = (Z3.Expr.to_string expr) *)
-
 let rec curryBinaryZ3Fn (fn:Z3.context->Z3.Expr.expr->Z3.Expr.expr->Z3.Expr.expr) (ctx:Z3.context) (expr_list:Z3.Expr.expr list):Z3.Expr.expr =
   match expr_list with 
     []        -> failwith "Invalid Expression List as input to Binary Expression Function"
@@ -51,6 +49,7 @@ let rec scanForModifiedVariables (stmt:stmt): string list =
   | Assign(identifier,expr)     -> [identifier]
   | Ifthen(_,if_stmt,else_stmt) -> (scanForModifiedVariables if_stmt)@(scanForModifiedVariables else_stmt)
   | Whileloop(_,_,stmt')        -> scanForModifiedVariables stmt'
+  | ArrAssign(identifier,idx)
   | _                           -> failwith ("Unsupported statement"^(stmtToStr stmt))
 
 let rec exprToIdentifier (expr:Implang.expr):string= 
@@ -94,7 +93,6 @@ let rec variablesToForAllExpr (vars:string list) (expr:expr):expr =
    hd::tl -> Forall(Var(hd),variablesToForAllExpr tl expr )
   | []    -> expr                          
 
-(*TODO: Make Array Map a Reference*)
 let rec stmtToPredicate (array_map_ref:((expr ExprMap.t) StringMap.t) ref) (stmt:stmt) (post_predicate:expr):expr= 
   match stmt with 
       Skip                                ->  post_predicate
